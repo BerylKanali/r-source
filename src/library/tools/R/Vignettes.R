@@ -939,6 +939,10 @@ vignetteInfo <- function(file)
     title <- c(.get_vignette_metadata(lines, "IndexEntry"), "")[1L]
     ## \VignetteDepends
     depends <- .get_vignette_metadata(lines, "Depends")
+    ## \VignetteIndex
+    index <- .get_vignette_metadata(lines, "IndexNumber")
+    index <- if (length(index)) as.integer(index) else Inf
+    ## TODO check whether index is NA
     if(length(depends))
         depends <- unlist(strsplit(depends[1L], ", *"))
     ## \VignetteKeyword and old-style \VignetteKeywords
@@ -951,12 +955,13 @@ vignetteInfo <- function(file)
     ## package installation.
     engine <- getVignetteEngine(lines=lines)
     list(file = basename(file), title = title, depends = depends,
-         keywords = keywords, engine = engine)
+         keywords = keywords, engine = engine, index = index)
 }
 
 ## builds vignette indices from 'vigns', a pkgVignettes() result
 .build_vignette_index <- function(vigns)
 {
+    str(sys.calls())
     stopifnot(inherits(vigns, "pkgVignettes"))
 
     files <- vigns$docs
@@ -990,11 +995,11 @@ vignetteInfo <- function(file)
     }
 
     # Read vignette annotation from vignette source files
-    contents <- vector("list", length = nvigns * 5L)
-    dim(contents) <- c(nvigns, 5L)
+    contents <- vector("list", length = nvigns * 6L)
+    dim(contents) <- c(nvigns, 6L)
     for(i in seq_along(files))
         contents[i, ] <- vignetteInfo(files[i])
-    colnames(contents) <- c("File", "Title", "Depends", "Keywords", "Engine")
+    colnames(contents) <- c("File", "Title", "Depends", "Keywords", "Engine", "Index")
 
     ## This is to cover a temporary package installation
     ## by 'R CMD build' (via 'R CMD INSTALL -l <lib>)
@@ -1004,6 +1009,7 @@ vignetteInfo <- function(file)
 
     out <- data.frame(File = unlist(contents[, "File"]),
                       Title = unlist(contents[, "Title"]),
+                      Index = unlist(contents[, "Index"]),
                       PDF = outputs,	# Not necessarily PDF, but name it that for back compatibility
 		      R = "",		# May or may not be present
                       row.names = NULL, # avoid trying to compute row
@@ -1063,6 +1069,7 @@ function(pkg, con, vignetteIndex = NULL)
               if(NROW(vignetteIndex) == 0L) ## NROW(NULL) = 0
                   "The package contains no vignette meta-information."
               else {
+                  vignetteIndex <- vignetteIndex[order(vignetteIndex$Index, vignetteIndex$File), ]
                   vignetteIndex <- cbind(Package = pkg,
                                          as.matrix(vignetteIndex[, c("File", "Title", "PDF", "R")]))
                   makeVignetteTable(vignetteIndex, depth = 3L)
